@@ -1,31 +1,67 @@
--- Grow a Garden Hatch Reveal - All Egg Types
-local Workspace = game:GetService("Workspace")
+-- Grow a Garden - Hatch Reveal (Local Garden Watcher)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
 
--- Show popup when a new seed/pet/egg appears in workspace
-Workspace.DescendantAdded:Connect(function(child)
-    if typeof(child) == "Instance" and (child:IsA("Model") or child:IsA("Part")) then
-        local name = child.Name:lower()
+-- Notify that script is loaded
+StarterGui:SetCore("SendNotification", {
+    Title = "Jaypee Hatch Watcher",
+    Text = "Locating your garden...",
+    Duration = 4
+})
 
-        -- Check if the name includes keywords like egg, seed, pet, or bug
-        if name:find("egg") or name:find("seed") or name:find("pet") or name:find("bug") then
+-- Utility to detect hatch-related names
+local function isHatchItem(name)
+    name = name:lower()
+    return name:find("egg") or name:find("seed") or name:find("pet") or name:find("bug")
+end
+
+-- Try to find the local player's garden plot
+local function getPlayerPlot()
+    local plots = Workspace:FindFirstChild("GardenPlots")
+    if not plots then return nil end
+
+    for _, plot in pairs(plots:GetChildren()) do
+        if plot:IsA("Model") and plot.Name:find(LocalPlayer.Name) then
+            return plot
+        end
+    end
+    return nil
+end
+
+-- Hook new children added to your plot
+local function trackPlot(plot)
+    StarterGui:SetCore("SendNotification", {
+        Title = "🎯 Hatch Watch Enabled",
+        Text = "Watching: " .. plot.Name,
+        Duration = 4
+    })
+
+    plot.DescendantAdded:Connect(function(descendant)
+        if isHatchItem(descendant.Name) then
             StarterGui:SetCore("SendNotification", {
                 Title = "🎉 Hatch Detected!",
-                Text = "You got: " .. child.Name,
+                Text = "You got: " .. descendant.Name,
                 Duration = 5
             })
 
-            -- Optional console log
+            -- Optional console
             pcall(function()
-                rconsoleprint("[HATCH] --> " .. child.Name .. "\n")
+                rconsoleprint("[HATCH] --> " .. descendant.Name .. "\n")
             end)
         end
-    end
-end)
+    end)
+end
 
--- Confirmation message
-StarterGui:SetCore("SendNotification", {
-    Title = "Jaypee Hatch Logger",
-    Text = "Now tracking all egg hatches...",
-    Duration = 4
-})
+-- Wait until plot is available
+local function waitForPlotAndTrack()
+    local plot
+    while not plot do
+        plot = getPlayerPlot()
+        task.wait(1)
+    end
+    trackPlot(plot)
+end
+
+waitForPlotAndTrack()
