@@ -1,9 +1,9 @@
---[[ 
-    Grow a Garden - Duplicator Script
-    🐾 Supports seeds and pets
-    🔁 Partial name match (e.g. "Ostrich")
-    🐝 Real pet-follow behavior (Bee Swarm style)
-    ✅ Solara V3 compatible (no UI)
+--[[
+    Grow a Garden - Advanced Pet Duplicator
+    ✅ Auto-equip clones
+    🐾 Clone multiple pets (Ostrich, Peacock, etc.)
+    📦 Store clones in a custom folder in Workspace
+    🧊 Solara V3 Compatible (no GUI required)
 ]]
 
 repeat wait() until game:IsLoaded()
@@ -12,21 +12,38 @@ wait(3)
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HRP = Character:WaitForChild("HumanoidRootPart")
 
 --// Config
-local PARTIAL_NAME = "Ostrich [1.77 KG] [Age 1]"   -- Name match (can be partial like "Ostrich")
-local TYPE = "Pet"               -- "Seed" or "Pet"
-local CLONE_EVERY = 3            -- seconds between each duplication
-local MAX_CLONES = 10            -- stop after this many clones
+local TARGET_PETS = {
+    "Ostrich [1.77 KG] [Age 1]",
+    "Peacock [1.64 KG] [Age 1]"
+}
+
+local CLONE_INTERVAL = 3         -- seconds between clones
+local MAX_CLONES = 10            -- per pet
+local AUTO_EQUIP = true          -- equip after cloning
+local USE_CUSTOM_FOLDER = true
 
 --// State
-local clones = 0
+local cloneCounters = {}
+local PetClonesFolder = nil
 
---// Pet follow logic
+--// Setup folder
+if USE_CUSTOM_FOLDER then
+    PetClonesFolder = Workspace:FindFirstChild("ClonedPets")
+    if not PetClonesFolder then
+        PetClonesFolder = Instance.new("Folder")
+        PetClonesFolder.Name = "ClonedPets"
+        PetClonesFolder.Parent = Workspace
+    end
+end
+
+--// Make pets follow
 local function makeFollow(model)
     if not model:IsA("Model") or not model.PrimaryPart then return end
     local bp = Instance.new("BodyPosition")
@@ -43,41 +60,67 @@ local function makeFollow(model)
     end)
 end
 
---// Find original by partial match
-local function findOriginal()
+--// Find original
+local function findOriginal(name)
     for _, container in ipairs({Backpack, Character}) do
-        for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") and string.find(item.Name, PARTIAL_NAME) then
-                return item
+        for _, tool in ipairs(container:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == name then
+                return tool
             end
         end
     end
     return nil
 end
 
---// Main duplication loop
-coroutine.wrap(function()
-    while clones < MAX_CLONES do
-        local original = findOriginal()
-        if original then
-            local clone = original:Clone()
-            clones += 1
-            clone.Name = PARTIAL_NAME .. "_Clone" .. clones
+--// Clone loop for each pet
+for _, petName in ipairs(TARGET_PETS) do
+    cloneCounters[petName] = 0
 
-            if TYPE == "Pet" then
-                clone.Parent = workspace
+    coroutine.wrap(function()
+        while cloneCounters[petName] < MAX_CLONES do
+            local original = findOriginal(petName)
+            if original then
+                local clone = original:Clone()
+                clone.Name = petName .. "_Clone" .. tostring(cloneCounters[petName] + 1)
+                cloneCounters[petName] += 1
+
+                -- Set parent
+                if USE_CUSTOM_FOLDER then
+                    clone.Parent = PetClonesFolder
+                else
+                    clone.Parent = Workspace
+                end
+
+                -- Move and follow
+                if clone:IsA("Tool") then
+                    local success, model = pcall(function()
+                        if clone:FindFirstChildOfClass("Model") then
+                            return clone:FindFirstChildOfClass("Model")
+                        elseif clone:IsA("Model") then
+                            return clone
+                        else
+                            return nil
+                        end
+                    end)
+
+                    if success and model then
+                        makeFollow(model)
+                    end
+                end
+
                 clone:MoveTo(HRP.Position + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
-                makeFollow(clone)
+
+                -- Auto-equip
+                if AUTO_EQUIP and clone:IsDescendantOf(Backpack) then
+                    Character.Humanoid:EquipTool(clone)
+                end
+
+                print("[✅ Cloned]", clone.Name)
             else
-                clone.Parent = Backpack
+                warn("[⚠️ Missing]", petName)
             end
-
-            print("[✅ Duplicated]:", clone.Name)
-        else
-            warn("[⚠️ Not Found]:", PARTIAL_NAME)
+            wait(CLONE_INTERVAL)
         end
-        wait(CLONE_EVERY)
-    end
-
-    print("[🛑 Done] Max clones reached:", clones)
-end)()
+        print("[🛑 Done] Max clones for:", petName)
+    end)()
+end
