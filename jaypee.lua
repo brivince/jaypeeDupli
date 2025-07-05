@@ -1,25 +1,18 @@
--- Grow a Garden Hatch Reveal Script
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+-- Grow a Garden Hatch Reveal - All Egg Types
+local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
 
--- Optional: clear console if you're using output
-pcall(function()
-    rconsoleclear()
-    rconsolename("Hatch Logger")
-end)
-
--- Listen to new hatches inside workspace or effects
-local function onHatch(child)
-    if typeof(child) == "Instance" and child:IsA("Model") or child:IsA("Part") then
+-- Show popup when a new seed/pet/egg appears in workspace
+Workspace.DescendantAdded:Connect(function(child)
+    if typeof(child) == "Instance" and (child:IsA("Model") or child:IsA("Part")) then
         local name = child.Name:lower()
 
-        if name:find("seed") or name:find("bug") or name:find("pet") or name:find("egg") then
-            -- Send popup
+        -- Check if the name includes keywords like egg, seed, pet, or bug
+        if name:find("egg") or name:find("seed") or name:find("pet") or name:find("bug") then
             StarterGui:SetCore("SendNotification", {
                 Title = "🎉 Hatch Detected!",
                 Text = "You got: " .. child.Name,
-                Duration = 4
+                Duration = 5
             })
 
             -- Optional console log
@@ -28,14 +21,11 @@ local function onHatch(child)
             end)
         end
     end
-end
+end)
 
--- Watch workspace for new things
-game:GetService("Workspace").DescendantAdded:Connect(onHatch)
-
--- Confirm script loaded
+-- Confirmation message
 StarterGui:SetCore("SendNotification", {
     Title = "Jaypee Hatch Logger",
-    Text = "Listening for new hatches...",
-    Duration = 5
+    Text = "Now tracking all egg hatches...",
+    Duration = 4
 })
