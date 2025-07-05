@@ -1,5 +1,5 @@
 --[[ 
-    Grow a Garden - Duplicator Script
+    Grow a Garden - Duplicator Script (Fixed Auto-Deploy)
     🐾 Supports seeds and pets
     🔁 Partial name match (e.g. "Ostrich")
     🐝 Real pet-follow behavior (Bee Swarm style)
@@ -18,10 +18,10 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HRP = Character:WaitForChild("HumanoidRootPart")
 
 --// Config
-local PARTIAL_NAME = "Ostrich [1.93 KG] [Age 2]"  -- Name match (can be partial like "Ostrich")
+local PARTIAL_NAME = "Ostrich"   -- Partial name is okay
 local TYPE = "Pet"               -- "Seed" or "Pet"
-local CLONE_EVERY = 3            -- seconds between each duplication
-local MAX_CLONES = 10            -- stop after this many clones
+local CLONE_EVERY = 3            -- seconds between duplication
+local MAX_CLONES = 3             -- stop after this many clones
 
 --// State
 local clones = 0
@@ -38,12 +38,12 @@ local function makeFollow(model)
 
     RunService.Heartbeat:Connect(function()
         if HRP and model.PrimaryPart then
-            bp.Position = HRP.Position + Vector3.new(math.random(-4,4), 2, math.random(-4,4))
+            bp.Position = HRP.Position + Vector3.new(math.random(-4, 4), 2, math.random(-4, 4))
         end
     end)
 end
 
---// Find original by partial match
+--// Find the original Tool or Pet
 local function findOriginal()
     for _, container in ipairs({Backpack, Character}) do
         for _, item in ipairs(container:GetChildren()) do
@@ -55,21 +55,35 @@ local function findOriginal()
     return nil
 end
 
---// Main duplication loop
+--// Duplication logic
 coroutine.wrap(function()
     while clones < MAX_CLONES do
         local original = findOriginal()
         if original then
             local clone = original:Clone()
-            clones += 1
             clone.Name = PARTIAL_NAME .. "_Clone" .. clones
+            clones += 1
 
             if TYPE == "Pet" then
-                clone.Parent = workspace
-                clone:MoveTo(HRP.Position + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
-                makeFollow(clone)
+                -- Ensure pet has a valid model and PrimaryPart
+                if clone:FindFirstChild("Handle") then
+                    local petModel = Instance.new("Model", workspace)
+                    clone.Parent = petModel
+                    petModel.Name = clone.Name
+
+                    clone.Handle.Anchored = false
+                    petModel.PrimaryPart = clone.Handle
+                    petModel:SetPrimaryPartCFrame(HRP.CFrame + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
+
+                    makeFollow(petModel)
+                else
+                    warn("❌ Clone has no Handle for pet:", clone.Name)
+                end
             else
+                -- Seed goes to Backpack and gets equipped
                 clone.Parent = Backpack
+                wait(0.1)
+                LocalPlayer.Character.Humanoid:EquipTool(clone)
             end
 
             print("[✅ Duplicated]:", clone.Name)
