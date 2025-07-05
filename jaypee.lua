@@ -1,13 +1,13 @@
 --[[ 
-    Grow a Garden - Duplicator Script (Fixed Auto-Deploy)
-    🐾 Supports seeds and pets
-    🔁 Partial name match (e.g. "Ostrich")
-    🐝 Real pet-follow behavior (Bee Swarm style)
-    ✅ Solara V3 compatible (no UI)
+    🌱 Grow a Garden - Solara V3 Duplication Script
+    🐾 Supports Pets and Seeds
+    🔁 Partial Name Matching
+    🐝 Bee Swarm Style Pet-Follow
+    ✅ Solara V3 Compatible (No GUI)
 ]]
 
-repeat wait() until game:IsLoaded()
-wait(3)
+repeat task.wait() until game:IsLoaded()
+task.wait(3)
 
 --// Services
 local Players = game:GetService("Players")
@@ -18,32 +18,32 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HRP = Character:WaitForChild("HumanoidRootPart")
 
 --// Config
-local PARTIAL_NAME = "Ostrich"   -- Partial name is okay
-local TYPE = "Pet"               -- "Seed" or "Pet"
-local CLONE_EVERY = 3            -- seconds between duplication
-local MAX_CLONES = 3             -- stop after this many clones
+local PARTIAL_NAME = "Ostrich"    -- Partial match like "Ostrich"
+local TYPE = "Pet"                -- "Pet" or "Seed"
+local CLONE_EVERY = 3             -- Seconds between clones
+local MAX_CLONES = 3              -- Max clones before stopping
 
 --// State
 local clones = 0
 
---// Pet follow logic
+--// Pet follow function
 local function makeFollow(model)
     if not model:IsA("Model") or not model.PrimaryPart then return end
     local bp = Instance.new("BodyPosition")
     bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bp.P = 15000
+    bp.P = 12500
     bp.D = 1000
     bp.Position = model.PrimaryPart.Position
     bp.Parent = model.PrimaryPart
 
     RunService.Heartbeat:Connect(function()
         if HRP and model.PrimaryPart then
-            bp.Position = HRP.Position + Vector3.new(math.random(-4, 4), 2, math.random(-4, 4))
+            bp.Position = HRP.Position + Vector3.new(math.random(-5, 5), 2, math.random(-5, 5))
         end
     end)
 end
 
---// Find the original Tool or Pet
+--// Find original Tool by partial match
 local function findOriginal()
     for _, container in ipairs({Backpack, Character}) do
         for _, item in ipairs(container:GetChildren()) do
@@ -55,8 +55,8 @@ local function findOriginal()
     return nil
 end
 
---// Duplication logic
-coroutine.wrap(function()
+--// Main Duplication Logic
+task.spawn(function()
     while clones < MAX_CLONES do
         local original = findOriginal()
         if original then
@@ -65,24 +65,21 @@ coroutine.wrap(function()
             clones += 1
 
             if TYPE == "Pet" then
-                -- Ensure pet has a valid model and PrimaryPart
+                -- PET: deploy to workspace and follow
                 if clone:FindFirstChild("Handle") then
                     local petModel = Instance.new("Model", workspace)
                     clone.Parent = petModel
                     petModel.Name = clone.Name
-
-                    clone.Handle.Anchored = false
                     petModel.PrimaryPart = clone.Handle
-                    petModel:SetPrimaryPartCFrame(HRP.CFrame + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
-
+                    petModel:SetPrimaryPartCFrame(HRP.CFrame + Vector3.new(math.random(-6, 6), 0, math.random(-6, 6)))
                     makeFollow(petModel)
                 else
-                    warn("❌ Clone has no Handle for pet:", clone.Name)
+                    warn("❌ Pet missing Handle:", clone.Name)
                 end
             else
-                -- Seed goes to Backpack and gets equipped
+                -- SEED: put in backpack & auto equip
                 clone.Parent = Backpack
-                wait(0.1)
+                task.wait(0.1)
                 LocalPlayer.Character.Humanoid:EquipTool(clone)
             end
 
@@ -90,8 +87,9 @@ coroutine.wrap(function()
         else
             warn("[⚠️ Not Found]:", PARTIAL_NAME)
         end
-        wait(CLONE_EVERY)
+
+        task.wait(CLONE_EVERY)
     end
 
-    print("[🛑 Done] Max clones reached:", clones)
-end)()
+    print("[🛑 Finished] Max clones reached:", clones)
+end)
