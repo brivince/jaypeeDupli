@@ -16,7 +16,7 @@ local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 --// Configuration
-local ITEM_NAME = "Bee Egg" -- Change this to the exact name of the seed or pet you want to duplicate
+local ITEM_NAME = "Ostrich" -- Change this to the exact name of the seed or pet you want to duplicate
 local ITEM_TYPE = "Pet"     -- Choose between "Seed" or "Pet"
 local DUPLICATE_INTERVAL = 3 -- Time in seconds between each auto-duplicate
 local DUPLICATE_AMOUNT = 1   -- How many copies per cycle
