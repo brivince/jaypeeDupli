@@ -3,7 +3,8 @@
     🧊 Fake pet & seed clones appear in Backpack (or auto-equip if blocked)
     🔁 Toggle cloning on/off in real time
     📋 Dropdown to choose pets or seeds
-    🌱 Full seed support (Tool or Item_String)
+    🔢 Quantity selector for cloning
+    🐾 Optional Pet-Follow Behavior
     💾 Saves & loads clones with mock DataStore
 ]]
 
@@ -14,7 +15,7 @@ wait(2)
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
@@ -30,8 +31,9 @@ local CLONE_INTERVAL = 2
 local MAX_CLONES = 5
 local CLONE_MODE = "Pet" -- or "Seed"
 local IS_RUNNING = false
+local PET_FOLLOW = false
 
---// Clone Targets (Pet or Seed mode)
+--// Clone Targets
 local TARGET_LIST = {
     "Ostrich [1.77 KG] [Age 1]",
     "Peacock [1.64 KG] [Age 1]",
@@ -39,9 +41,8 @@ local TARGET_LIST = {
     "Watermelon Seed"
 }
 local selectedTarget = TARGET_LIST[1]
-
---// Data
 local savedClones = {}
+local cloneInstances = {}
 
 --// Helpers
 local function createClone(name)
@@ -50,17 +51,10 @@ local function createClone(name)
     tool.RequiresHandle = false
     tool.CanBeDropped = true
 
-    if CLONE_MODE == "Seed" then
-        local label = Instance.new("StringValue")
-        label.Name = "Item_String"
-        label.Value = name
-        label.Parent = tool
-    else
-        local label = Instance.new("StringValue")
-        label.Name = "Item_String"
-        label.Value = name
-        label.Parent = tool
-    end
+    local label = Instance.new("StringValue")
+    label.Name = "Item_String"
+    label.Value = name
+    label.Parent = tool
 
     tool.Parent = Backpack
     if not tool:IsDescendantOf(Backpack) then
@@ -72,6 +66,7 @@ local function createClone(name)
         if humanoid then humanoid:EquipTool(tool) end
     end
 
+    table.insert(cloneInstances, tool)
     return tool
 end
 
@@ -99,6 +94,7 @@ end
 
 local function clearClones()
     savedClones = {}
+    cloneInstances = {}
     Backpack:ClearAllChildren()
     pcall(function()
         petDataStore:RemoveAsync(UserId .. "_Clones")
@@ -108,9 +104,8 @@ end
 local function startCloning()
     IS_RUNNING = true
     coroutine.wrap(function()
-        local count = 0
-        while IS_RUNNING and count < MAX_CLONES do
-            count += 1
+        for i = 1, MAX_CLONES do
+            if not IS_RUNNING then break end
             table.insert(savedClones, selectedTarget)
             createClone(selectedTarget)
             wait(CLONE_INTERVAL)
@@ -122,7 +117,26 @@ local function stopCloning()
     IS_RUNNING = false
 end
 
---// UI Setup
+local function petFollowLoop()
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if not PET_FOLLOW then return end
+        for _, clone in ipairs(cloneInstances) do
+            if clone and clone:IsDescendantOf(workspace) then
+                local targetPos = Character:GetPivot().Position + Vector3.new(math.random(-3,3), 0, math.random(-3,3))
+                local hrp = Instance.new("Part")
+                hrp.Anchored = true
+                hrp.CanCollide = false
+                hrp.Size = Vector3.new(1,1,1)
+                hrp.CFrame = CFrame.new(targetPos)
+                hrp.Parent = workspace
+                TweenService:Create(clone, TweenInfo.new(0.5), {Position = targetPos}):Play()
+                game:GetService("Debris"):AddItem(hrp, 1)
+            end
+        end
+    end)
+end
+
+--// UI
 local gui = Instance.new("ScreenGui")
 local frame = Instance.new("Frame")
 local title = Instance.new("TextLabel")
@@ -130,25 +144,35 @@ local dropdown = Instance.new("TextButton")
 local toggle = Instance.new("TextButton")
 local saveBtn = Instance.new("TextButton")
 local clearBtn = Instance.new("TextButton")
+local amountBox = Instance.new("TextBox")
+local followToggle = Instance.new("TextButton")
 
--- Parent
-if gethui then gui.Parent = gethui() else gui.Parent = CoreGui end
+pcall(function()
+    if gethui then gui.Parent = gethui() elseif syn and syn.protect_gui then syn.protect_gui(gui); gui.Parent = CoreGui else gui.Parent = CoreGui end
+end)
 
--- Style
-frame.Size = UDim2.new(0, 260, 0, 240)
-frame.Position = UDim2.new(0, 20, 0.5, -120)
+frame.Size = UDim2.new(0, 280, 0, 300)
+frame.Position = UDim2.new(0, 20, 0.5, -150)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.Parent = gui
 
 -- Title
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🔁 Clone Tool"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextScaled = true
-title.Parent = frame
+local function makeLabel(text, y)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 30)
+    label.Position = UDim2.new(0, 0, 0, y)
+    label.Text = text
+    label.TextColor3 = Color3.new(1,1,1)
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.BackgroundTransparency = 1
+    label.Parent = frame
+    return label
+end
 
--- Dropdown for targets
+makeLabel("🔁 Clone Tool", 0)
+
+-- Dropdown
 dropdown.Position = UDim2.new(0, 10, 0, 40)
 dropdown.Size = UDim2.new(1, -20, 0, 30)
 dropdown.Text = "🎯 Select: " .. selectedTarget
@@ -164,15 +188,31 @@ dropdown.MouseButton1Click:Connect(function()
     CLONE_MODE = selectedTarget:lower():find("seed") and "Seed" or "Pet"
 end)
 
--- Toggle button
-toggle.Position = UDim2.new(0, 10, 0, 80)
+-- Quantity Input
+amountBox.Position = UDim2.new(0, 10, 0, 80)
+amountBox.Size = UDim2.new(1, -20, 0, 30)
+amountBox.PlaceholderText = "🔢 Max Clones (e.g., 5)"
+amountBox.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+amountBox.TextColor3 = Color3.new(1,1,1)
+amountBox.Text = tostring(MAX_CLONES)
+amountBox.Parent = frame
+amountBox.FocusLost:Connect(function()
+    local num = tonumber(amountBox.Text)
+    if num and num >= 1 and num <= 50 then
+        MAX_CLONES = num
+    else
+        amountBox.Text = tostring(MAX_CLONES)
+    end
+end)
+
+-- Toggle Cloning
+toggle.Position = UDim2.new(0, 10, 0, 120)
 toggle.Size = UDim2.new(1, -20, 0, 30)
 toggle.Text = "▶️ Start Cloning"
 toggle.BackgroundColor3 = Color3.fromRGB(40, 120, 40)
 toggle.TextColor3 = Color3.new(1, 1, 1)
 toggle.Parent = frame
 
--- Toggle action
 toggle.MouseButton1Click:Connect(function()
     if IS_RUNNING then
         stopCloning()
@@ -185,7 +225,19 @@ toggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- Save button
+-- Toggle Pet Follow
+followToggle.Position = UDim2.new(0, 10, 0, 160)
+followToggle.Size = UDim2.new(1, -20, 0, 30)
+followToggle.Text = "🐾 Pet Follow: OFF"
+followToggle.BackgroundColor3 = Color3.fromRGB(90, 60, 60)
+followToggle.TextColor3 = Color3.new(1, 1, 1)
+followToggle.Parent = frame
+followToggle.MouseButton1Click:Connect(function()
+    PET_FOLLOW = not PET_FOLLOW
+    followToggle.Text = PET_FOLLOW and "🐾 Pet Follow: ON" or "🐾 Pet Follow: OFF"
+end)
+
+-- Save
 saveBtn.Position = UDim2.new(0, 10, 1, -60)
 saveBtn.Size = UDim2.new(0.5, -15, 0, 30)
 saveBtn.Text = "💾 Save"
@@ -194,16 +246,17 @@ saveBtn.TextColor3 = Color3.new(1, 1, 1)
 saveBtn.Parent = frame
 saveBtn.MouseButton1Click:Connect(saveClones)
 
--- Clear button
+-- Clear
 clearBtn.Position = UDim2.new(0.5, 5, 1, -60)
 clearBtn.Size = UDim2.new(0.5, -15, 0, 30)
 clearBtn.Text = "🗑️ Clear"
 clearBtn.BackgroundColor3 = Color3.fromRGB(120, 60, 60)
 clearBtn.TextColor3 = Color3.new(1, 1, 1)
 clearBtn.Parent = frame
-clearBtn.MouseButton1Click:Connect(function()
-    clearClones()
-end)
+clearBtn.MouseButton1Click:Connect(clearClones)
 
--- Startup
+-- Start Pet Follow loop
+petFollowLoop()
+
+-- Load saved clones
 loadClones()
