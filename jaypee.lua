@@ -18,7 +18,7 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HRP = Character:WaitForChild("HumanoidRootPart")
 
 --// Config
-local PARTIAL_NAME = "Ostrich"    -- Partial match like "Ostrich"
+local PARTIAL_NAME = "Ostrich [1.93 KG] [Age 2]"   -- Partial match like "Ostrich"
 local TYPE = "Pet"                -- "Pet" or "Seed"
 local CLONE_EVERY = 3             -- Seconds between clones
 local MAX_CLONES = 3              -- Max clones before stopping
