@@ -1,54 +1,83 @@
---[[
-    ✅ Grow a Garden Pet & Seed Duplicator (Deploy to Pet GUI)
-    🧊 Clones only created and listed in pet UI (max 3 active)
-    ❌ No auto-equip, no join reload
+--[[ 
+    Grow a Garden - Duplicator Script
+    🐾 Supports seeds and pets
+    🔁 Partial name match (e.g. "Ostrich")
+    🐝 Real pet-follow behavior (Bee Swarm style)
+    ✅ Solara V3 compatible (no UI)
 ]]
 
 repeat wait() until game:IsLoaded()
-wait(2)
+wait(3)
 
 --// Services
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
 
 --// Config
-local CLONE_MODE = "Pet"
-local TARGET_LIST = {
-    "Bald Eagle",
-    "Honey Bee",
-    "Ostrich"
-}
-local MAX_ACTIVE_PETS = 3
+local PARTIAL_NAME = "Ostrich"   -- Name match (can be partial like "Ostrich")
+local TYPE = "Pet"               -- "Seed" or "Pet"
+local CLONE_EVERY = 3            -- seconds between each duplication
+local MAX_CLONES = 10            -- stop after this many clones
 
---// Helpers
-local function deployPet(name)
-    local guiFolder = LocalPlayer:FindFirstChild("PlayerGui")
-    if not guiFolder then return end
+--// State
+local clones = 0
 
-    local activePets = guiFolder:FindFirstChild("Pet_Active")
-    if not activePets then return end
+--// Pet follow logic
+local function makeFollow(model)
+    if not model:IsA("Model") or not model.PrimaryPart then return end
+    local bp = Instance.new("BodyPosition")
+    bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bp.P = 15000
+    bp.D = 1000
+    bp.Position = model.PrimaryPart.Position
+    bp.Parent = model.PrimaryPart
 
-    local currentCount = #activePets:GetChildren()
-    if currentCount >= MAX_ACTIVE_PETS then return end
-
-    local petFrame = Instance.new("Frame")
-    petFrame.Name = name
-    petFrame.Size = UDim2.new(0, 200, 0, 100)
-    petFrame.BackgroundColor3 = Color3.fromRGB(140, 90, 60)
-
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Text = name
-    nameLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-    nameLabel.Size = UDim2.new(1, 0, 0.3, 0)
-    nameLabel.Parent = petFrame
-
-    petFrame.Parent = activePets
+    RunService.Heartbeat:Connect(function()
+        if HRP and model.PrimaryPart then
+            bp.Position = HRP.Position + Vector3.new(math.random(-4,4), 2, math.random(-4,4))
+        end
+    end)
 end
 
---// Deploy pets to GUI
-for _, petName in ipairs(TARGET_LIST) do
-    deployPet(petName)
-    wait(1)
+--// Find original by partial match
+local function findOriginal()
+    for _, container in ipairs({Backpack, Character}) do
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") and string.find(item.Name, PARTIAL_NAME) then
+                return item
+            end
+        end
+    end
+    return nil
 end
+
+--// Main duplication loop
+coroutine.wrap(function()
+    while clones < MAX_CLONES do
+        local original = findOriginal()
+        if original then
+            local clone = original:Clone()
+            clones += 1
+            clone.Name = PARTIAL_NAME .. "_Clone" .. clones
+
+            if TYPE == "Pet" then
+                clone.Parent = workspace
+                clone:MoveTo(HRP.Position + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
+                makeFollow(clone)
+            else
+                clone.Parent = Backpack
+            end
+
+            print("[✅ Duplicated]:", clone.Name)
+        else
+            warn("[⚠️ Not Found]:", PARTIAL_NAME)
+        end
+        wait(CLONE_EVERY)
+    end
+
+    print("[🛑 Done] Max clones reached:", clones)
+end)()
