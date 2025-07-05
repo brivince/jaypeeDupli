@@ -1,13 +1,12 @@
---[[ 
-    🌱 Grow a Garden - Solara V3 Duplication Script
-    🐾 Supports Pets and Seeds
-    🔁 Partial Name Matching
-    🐝 Bee Swarm Style Pet-Follow
-    ✅ Solara V3 Compatible (No GUI)
+--[[
+    @author brivince
+    @description Grow a Garden duplicator script (no GUI, compatible with Solara V3)
+    This version auto-duplicates a selected seed or pet every few seconds.
 ]]
 
-repeat task.wait() until game:IsLoaded()
-task.wait(3)
+-- Wait for game to fully load
+repeat wait() until game:IsLoaded()
+wait(3)
 
 --// Services
 local Players = game:GetService("Players")
@@ -15,39 +14,36 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HRP = Character:WaitForChild("HumanoidRootPart")
 
---// Config
-local PARTIAL_NAME = "Ostrich [1.93 KG] [Age 2]"   -- Partial match like "Ostrich"
-local TYPE = "Pet"                -- "Pet" or "Seed"
-local CLONE_EVERY = 3             -- Seconds between clones
-local MAX_CLONES = 3              -- Max clones before stopping
+--// Configuration
+local ITEM_NAME = "Bee Egg" -- Change this to the exact name of the seed or pet you want to duplicate
+local ITEM_TYPE = "Pet"     -- Choose between "Seed" or "Pet"
+local DUPLICATE_INTERVAL = 3 -- Time in seconds between each auto-duplicate
+local DUPLICATE_AMOUNT = 1   -- How many copies per cycle
 
---// State
-local clones = 0
-
---// Pet follow function
-local function makeFollow(model)
-    if not model:IsA("Model") or not model.PrimaryPart then return end
-    local bp = Instance.new("BodyPosition")
-    bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bp.P = 12500
-    bp.D = 1000
-    bp.Position = model.PrimaryPart.Position
-    bp.Parent = model.PrimaryPart
+--// Pet-follow script
+local function petFollowScript(petModel)
+    if not petModel:IsA("Model") or not petModel.PrimaryPart then return end
+    local follow = Instance.new("BodyPosition")
+    follow.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    follow.P = 15000
+    follow.D = 1000
+    follow.Position = petModel.PrimaryPart.Position
+    follow.Parent = petModel.PrimaryPart
 
     RunService.Heartbeat:Connect(function()
-        if HRP and model.PrimaryPart then
-            bp.Position = HRP.Position + Vector3.new(math.random(-5, 5), 2, math.random(-5, 5))
+        local root = Character:FindFirstChild("HumanoidRootPart")
+        if root and petModel.PrimaryPart then
+            follow.Position = root.Position + Vector3.new(math.random(-4,4), 2, math.random(-4,4))
         end
     end)
 end
 
---// Find original Tool by partial match
-local function findOriginal()
+--// Get original item
+local function findOriginalItem()
     for _, container in ipairs({Backpack, Character}) do
         for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") and string.find(item.Name, PARTIAL_NAME) then
+            if item.Name == ITEM_NAME then
                 return item
             end
         end
@@ -55,41 +51,27 @@ local function findOriginal()
     return nil
 end
 
---// Main Duplication Logic
-task.spawn(function()
-    while clones < MAX_CLONES do
-        local original = findOriginal()
+--// Duplication loop
+coroutine.wrap(function()
+    while true do
+        local original = findOriginalItem()
         if original then
-            local clone = original:Clone()
-            clone.Name = PARTIAL_NAME .. "_Clone" .. clones
-            clones += 1
-
-            if TYPE == "Pet" then
-                -- PET: deploy to workspace and follow
-                if clone:FindFirstChild("Handle") then
-                    local petModel = Instance.new("Model", workspace)
-                    clone.Parent = petModel
-                    petModel.Name = clone.Name
-                    petModel.PrimaryPart = clone.Handle
-                    petModel:SetPrimaryPartCFrame(HRP.CFrame + Vector3.new(math.random(-6, 6), 0, math.random(-6, 6)))
-                    makeFollow(petModel)
-                else
-                    warn("❌ Pet missing Handle:", clone.Name)
+            for i = 1, DUPLICATE_AMOUNT do
+                local clone = original:Clone()
+                if ITEM_TYPE == "Seed" then
+                    clone.Parent = Backpack
+                elseif ITEM_TYPE == "Pet" then
+                    clone.Parent = workspace
+                    clone:MoveTo(Character:GetPivot().Position + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
+                    petFollowScript(clone)
                 end
-            else
-                -- SEED: put in backpack & auto equip
-                clone.Parent = Backpack
-                task.wait(0.1)
-                LocalPlayer.Character.Humanoid:EquipTool(clone)
+                wait(0.1)
             end
-
-            print("[✅ Duplicated]:", clone.Name)
         else
-            warn("[⚠️ Not Found]:", PARTIAL_NAME)
+            warn("Item not found: " .. ITEM_NAME)
         end
-
-        task.wait(CLONE_EVERY)
+        wait(DUPLICATE_INTERVAL)
     end
+end)()
 
-    print("[🛑 Finished] Max clones reached:", clones)
-end)
+print("[Duplicator] Started for: " .. ITEM_NAME)
