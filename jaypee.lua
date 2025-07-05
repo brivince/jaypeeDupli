@@ -1,9 +1,8 @@
 --[[
-    Grow a Garden - Persistent Pet Duplicator (Full UI + Save/Load)
-    ✅ Clone pets and view them in a UI
-    💾 Manual Save and Clear buttons
-    📊 Metadata parsed: name, weight, age
-    🧊 Solara V3 Compatible
+    ✅ Grow a Garden Pet Cloner (Solara v3 Compatible)
+    🧊 Fake pet clones appear in your Backpack or are equipped directly
+    💾 UI shows cloned pets
+    🔁 Load & Save to DataStore (client-side simulation)
 ]]
 
 repeat wait() until game:IsLoaded()
@@ -20,60 +19,68 @@ local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local UserId = tostring(LocalPlayer.UserId)
 
---// DataStore
+--// DataStore Setup
 local petDataStore = DataStoreService:GetDataStore("SavedPetClones")
 
 --// Config
 local TARGET_PETS = {
-    "Ostrich [1.77 KG] [Age 2]",
+    "Ostrich [1.77 KG] [Age 1]",
     "Peacock [1.64 KG] [Age 1]"
 }
 local MAX_CLONES = 3
 local CLONE_INTERVAL = 2
-local AUTO_EQUIP = false
+local AUTO_EQUIP = true
 
---// Metadata storage
+--// Data
 local savedPets = {}
 
---// Helper: Parse metadata
+--// Parse metadata from name
 local function parsePetString(name)
     local base, weight, age = name:match("^(.-)%s%[(.-)%]%s%[Age%s(%d+)%]$")
     return {
         full = name,
         base = base or name,
-        weight = weight or "??",
+        weight = weight or "?",
         age = tonumber(age) or 0
     }
 end
 
---// Helper: Create fake tool with metadata
+--// Create fake Tool clone
 local function createFakePet(petData)
     local tool = Instance.new("Tool")
     tool.Name = petData.full
     tool.RequiresHandle = false
     tool.CanBeDropped = true
 
-    local meta = Instance.new("StringValue")
-    meta.Name = "Item_String"
-    meta.Value = petData.full
-    meta.Parent = tool
+    local label = Instance.new("StringValue")
+    label.Name = "Item_String"
+    label.Value = petData.full
+    label.Parent = tool
+
+    -- Try placing in Backpack
+    tool.Parent = Backpack
+
+    -- If blocked, place into Character instead
+    if not tool:IsDescendantOf(Backpack) then
+        tool.Parent = Character
+    end
 
     return tool
 end
 
---// Save pets
+--// Save clones to DataStore
 local function saveClonedPets()
-    local data = {}
+    local toSave = {}
     for _, pet in ipairs(savedPets) do
-        table.insert(data, pet.full)
+        table.insert(toSave, pet.full)
     end
     pcall(function()
-        petDataStore:SetAsync(UserId .. "_ClonedPets", data)
+        petDataStore:SetAsync(UserId .. "_ClonedPets", toSave)
     end)
-    print("[💾 Saved pets to DataStore]")
+    print("[💾 Saved cloned pets]")
 end
 
---// Load pets
+--// Load saved clones from DataStore
 local function loadClonedPets()
     local success, data = pcall(function()
         return petDataStore:GetAsync(UserId .. "_ClonedPets")
@@ -82,14 +89,13 @@ local function loadClonedPets()
         for _, name in ipairs(data) do
             local meta = parsePetString(name)
             table.insert(savedPets, meta)
-            local tool = createFakePet(meta)
-            tool.Parent = Backpack
+            createFakePet(meta)
         end
-        print("[📦 Loaded pets]", #savedPets)
+        print("[📦 Loaded]", #savedPets, "pets")
     end
 end
 
---// Clear pets
+--// Clear saved data
 local function clearSavedPets()
     savedPets = {}
     Backpack:ClearAllChildren()
@@ -99,42 +105,48 @@ local function clearSavedPets()
     print("[🗑️ Cleared saved pets]")
 end
 
---// Clone logic
+--// Clone pets
 for _, petName in ipairs(TARGET_PETS) do
     for i = 1, MAX_CLONES do
         local petMeta = parsePetString(petName)
         petMeta.full = petName .. "_Clone" .. i
         table.insert(savedPets, petMeta)
-
-        local tool = createFakePet(petMeta)
-        tool.Parent = Backpack
+        createFakePet(petMeta)
 
         if AUTO_EQUIP then
-            Character.Humanoid:EquipTool(tool)
+            Character.Humanoid:EquipTool(petMeta.full)
         end
-
         wait(CLONE_INTERVAL)
     end
 end
 
 --// UI Setup
-local screenGui = Instance.new("ScreenGui", PlayerGui)
-screenGui.Name = "PetClonerUI"
+local gui = Instance.new("ScreenGui")
+local frame = Instance.new("Frame")
+local title = Instance.new("TextLabel")
+local petList = Instance.new("TextLabel")
+local saveBtn = Instance.new("TextButton")
+local clearBtn = Instance.new("TextButton")
 
-local frame = Instance.new("Frame", screenGui)
+-- Properties
+gui.Name = "PetClonerGui"
+gui.Parent = PlayerGui
+
+frame.Size = UDim2.new(0, 240, 0, 200)
 frame.Position = UDim2.new(0, 20, 0.5, -100)
-frame.Size = UDim2.new(0, 220, 0, 200)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
+frame.Parent = gui
 
-local title = Instance.new("TextLabel", frame)
+-- Title
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "🐾 Saved Pets"
-title.TextColor3 = Color3.new(1,1,1)
+title.Text = "🐾 Cloned Pets"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
 title.TextScaled = true
+title.Parent = frame
 
-local petList = Instance.new("TextLabel", frame)
+-- Pet List
 petList.Position = UDim2.new(0, 0, 0, 35)
 petList.Size = UDim2.new(1, 0, 1, -75)
 petList.BackgroundTransparency = 1
@@ -145,8 +157,9 @@ petList.Font = Enum.Font.Code
 petList.TextWrapped = true
 petList.TextScaled = false
 petList.TextSize = 14
+petList.Parent = frame
 
-local function updatePetList()
+local function updateUI()
     local lines = {}
     for _, pet in ipairs(savedPets) do
         table.insert(lines, string.format("%s | %s | Age %d", pet.base, pet.weight, pet.age))
@@ -154,29 +167,33 @@ local function updatePetList()
     petList.Text = table.concat(lines, "\n")
 end
 
-local saveBtn = Instance.new("TextButton", frame)
+-- Buttons
 saveBtn.Position = UDim2.new(0, 10, 1, -35)
 saveBtn.Size = UDim2.new(0.5, -15, 0, 30)
 saveBtn.Text = "💾 Save"
 saveBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 40)
-saveBtn.TextColor3 = Color3.new(1,1,1)
-saveBtn.MouseButton1Click:Connect(function()
-    saveClonedPets()
-end)
+saveBtn.TextColor3 = Color3.new(1, 1, 1)
+saveBtn.Parent = frame
 
-local clearBtn = Instance.new("TextButton", frame)
 clearBtn.Position = UDim2.new(0.5, 5, 1, -35)
 clearBtn.Size = UDim2.new(0.5, -15, 0, 30)
 clearBtn.Text = "🗑️ Clear"
 clearBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
-clearBtn.TextColor3 = Color3.new(1,1,1)
-clearBtn.MouseButton1Click:Connect(function()
-    clearSavedPets()
-    updatePetList()
+clearBtn.TextColor3 = Color3.new(1, 1, 1)
+clearBtn.Parent = frame
+
+-- Callbacks
+saveBtn.MouseButton1Click:Connect(function()
+    saveClonedPets()
 end)
 
---// Initialize
-loadClonedPets()
-updatePetList()
+clearBtn.MouseButton1Click:Connect(function()
+    clearSavedPets()
+    updateUI()
+end)
 
-print("[🎛️ UI ready] View, save, and clear pets in UI")
+-- Run UI update
+loadClonedPets()
+updateUI()
+
+print("[✅ Cloner Ready] Pets visible and saved")
