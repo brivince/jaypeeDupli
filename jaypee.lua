@@ -25,7 +25,7 @@ local petDataStore = DataStoreService:GetDataStore("SavedPetClones")
 
 --// Config
 local TARGET_PETS = {
-    "Ostrich [1.77 KG] [Age 1]",
+    "Ostrich [1.77 KG] [Age 2]",
     "Peacock [1.64 KG] [Age 1]"
 }
 local MAX_CLONES = 3
