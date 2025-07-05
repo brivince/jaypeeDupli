@@ -1,7 +1,7 @@
 --[[
     ✅ Grow a Garden Pet Cloner (Solara v3 Compatible)
     🧊 Fake pet clones appear in your Backpack or are equipped directly
-    💾 UI shows cloned pets
+    💾 UI shows cloned pets (now uses CoreGui for better compatibility)
     🔁 Load & Save to DataStore (client-side simulation)
 ]]
 
@@ -11,10 +11,9 @@ wait(2)
 --// Services
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
-local StarterGui = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local UserId = tostring(LocalPlayer.UserId)
@@ -114,7 +113,10 @@ for _, petName in ipairs(TARGET_PETS) do
         createFakePet(petMeta)
 
         if AUTO_EQUIP then
-            Character.Humanoid:EquipTool(petMeta.full)
+            local tool = Backpack:FindFirstChild(petMeta.full) or Character:FindFirstChild(petMeta.full)
+            if tool then
+                Character.Humanoid:EquipTool(tool)
+            end
         end
         wait(CLONE_INTERVAL)
     end
@@ -130,7 +132,8 @@ local clearBtn = Instance.new("TextButton")
 
 -- Properties
 gui.Name = "PetClonerGui"
-gui.Parent = PlayerGui
+gui.ResetOnSpawn = false
+gui.Parent = CoreGui -- Use CoreGui for exploit compatibility
 
 frame.Size = UDim2.new(0, 240, 0, 200)
 frame.Position = UDim2.new(0, 20, 0.5, -100)
@@ -196,4 +199,4 @@ end)
 loadClonedPets()
 updateUI()
 
-print("[✅ Cloner Ready] Pets visible and saved")
+print("[✅ Cloner Ready] Pets visible and UI loaded")
