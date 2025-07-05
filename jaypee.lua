@@ -1,9 +1,8 @@
 --[[
-    Grow a Garden - Advanced Pet Duplicator (With UI + Save/Load)
-    ✅ Toggle UI (enable/disable)
-    🎚️ Clone quantity slider
-    💾 Save/Load clone quantity using DataStore
-    🎒 Stores clones in Backpack (no auto-deploy)
+    Grow a Garden - Persistent Pet Duplicator (DataStore Save)
+    ✅ Clone pets (Tools) by name
+    💾 Save pet Name, Weight, and Age to DataStore
+    ♻️ Reload pets into Backpack when rejoining
     🧊 Solara V3 Compatible
 ]]
 
@@ -12,15 +11,13 @@ wait(3)
 
 --// Services
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local DataStoreService = game:GetService("DataStoreService")
-local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HRP = Character:WaitForChild("HumanoidRootPart")
+local UserId = tostring(LocalPlayer.UserId)
 
 --// Config
 local TARGET_PETS = {
@@ -28,95 +25,76 @@ local TARGET_PETS = {
     "Peacock [1.64 KG] [Age 1]"
 }
 
-local CLONE_INTERVAL = 3         -- seconds between clones
-local AUTO_EQUIP = false         -- equip after cloning
-local MAX_CLONES_DEFAULT = 10
+local MAX_CLONES = 3
+local CLONE_INTERVAL = 2
+local AUTO_EQUIP = false
 
---// UI Toggle
-local UI_ENABLED = false
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.J then
-        UI_ENABLED = not UI_ENABLED
-        print("[🪄 Duplicator] UI is now", UI_ENABLED and "ENABLED" or "DISABLED")
-    end
-end)
+--// Datastore
+local petDataStore = DataStoreService:GetDataStore("SavedPetClones")
 
---// DataStore Setup
-local ds = DataStoreService:GetDataStore("PetDupeSettings")
-local MAX_CLONES = MAX_CLONES_DEFAULT
-
-local function loadSettings()
-    local success, result = pcall(function()
-        return ds:GetAsync(LocalPlayer.UserId .. "_cloneCount")
+--// Helpers
+local function saveClonedPets(petList)
+    local success, err = pcall(function()
+        petDataStore:SetAsync(UserId .. "_ClonedPets", petList)
     end)
-    if success and typeof(result) == "number" then
-        MAX_CLONES = result
-        print("[💾 Loaded] Clone limit:", MAX_CLONES)
+    if success then
+        print("[✅ Saved cloned pets]", petList)
+    else
+        warn("[❌ Failed to save pets]", err)
     end
 end
 
-local function saveSettings()
-    pcall(function()
-        ds:SetAsync(LocalPlayer.UserId .. "_cloneCount", MAX_CLONES)
+local function loadClonedPets()
+    local success, data = pcall(function()
+        return petDataStore:GetAsync(UserId .. "_ClonedPets")
     end)
-end
-
-loadSettings()
-
---// Slider Simulation (adjustable by changing MAX_CLONES variable)
-print("[🎚️ Clone Quantity Slider] Current Limit:", MAX_CLONES)
-
---// State
-local cloneCounters = {}
-
---// Find original
-local function findOriginal(name)
-    for _, container in ipairs({Backpack, Character}) do
-        for _, tool in ipairs(container:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name == name then
-                return tool
-            end
-        end
+    if success and data then
+        return data
     end
-    return nil
+    return {}
 end
 
---// Clone loop for each pet
+local function createFakePet(name)
+    local tool = Instance.new("Tool")
+    tool.Name = name
+    tool.RequiresHandle = false
+    tool.CanBeDropped = true
+
+    local label = Instance.new("StringValue")
+    label.Name = "Item_String"
+    label.Value = name
+    label.Parent = tool
+
+    return tool
+end
+
+--// Clone loop (save to datastore)
+local clonedList = {}
 for _, petName in ipairs(TARGET_PETS) do
-    cloneCounters[petName] = 0
-
-    coroutine.wrap(function()
-        while cloneCounters[petName] < MAX_CLONES do
-            if not UI_ENABLED then wait(1) continue end
-
-            local original = findOriginal(petName)
-            if original then
-                local clone = original:Clone()
-                clone.Name = petName .. "_Clone" .. tostring(cloneCounters[petName] + 1)
-                cloneCounters[petName] += 1
-
-                -- Put clone into Backpack
-                clone.Parent = Backpack
-
-                -- Auto-equip (optional)
-                if AUTO_EQUIP then
-                    Character.Humanoid:EquipTool(clone)
-                end
-
-                print("[✅ Cloned to Backpack]", clone.Name)
-            else
-                warn("[⚠️ Missing]", petName)
-            end
-            wait(CLONE_INTERVAL)
+    for i = 1, MAX_CLONES do
+        local cloneName = petName .. "_Clone" .. tostring(i)
+        local tool = createFakePet(cloneName)
+        tool.Parent = Backpack
+        table.insert(clonedList, cloneName)
+        if AUTO_EQUIP then
+            Character.Humanoid:EquipTool(tool)
         end
-        print("[🛑 Done] Max clones for:", petName)
-    end)()
+        wait(CLONE_INTERVAL)
+    end
 end
 
---// Save before leaving
+--// Save when leaving
 Players.PlayerRemoving:Connect(function(player)
     if player == LocalPlayer then
-        saveSettings()
+        saveClonedPets(clonedList)
     end
 end)
+
+--// Load saved clones when joining
+local saved = loadClonedPets()
+for _, petName in ipairs(saved) do
+    local tool = createFakePet(petName)
+    tool.Parent = Backpack
+end
+
+print("[🐾 Loaded and ready] Persistent pets active.")
