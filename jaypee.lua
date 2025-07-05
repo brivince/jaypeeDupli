@@ -1,78 +1,45 @@
---[[ 
-🌱 Grow a Garden - Hatch Reveal GUI (Solara V3)
-👀 Shows what pet is inside each growing egg before hatching
-✅ Works with Solara V3 executor
-]]
+-- Debug Notification + UI Test
+local success, err = pcall(function()
+    -- Notification to confirm script is loaded
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Jaypee UI",
+        Text = "Script Loaded ✅",
+        Duration = 5
+    })
 
--- Wait for game to load
-repeat task.wait() until game:IsLoaded()
-task.wait(2)
+    -- Create UI ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "JaypeeUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 
--- Services
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
+    -- Create red draggable frame
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 150)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    frame.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
 
--- Load Solara GUI library
-local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/3xploits7/Solara/main/Lib.lua"))()
-local win = lib:Window("🥚 Hatch Reveal", Color3.fromRGB(255, 180, 70), Enum.KeyCode.RightControl)
-local tab = win:Tab("🔍 Growing Eggs")
-
--- UI label to display egg contents
-local box = tab:Label("Scanning...")
-
--- Function to find all growing eggs and check their future pet
-local function getEggInfo()
-    local results = {}
-
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj.Name:lower():find("egg") then
-            local petModel = nil
-            local petName = nil
-
-            -- Try to find a hidden pet model inside
-            for _, child in pairs(obj:GetChildren()) do
-                if child:IsA("Model") then
-                    petModel = child
-                    break
-                end
-            end
-
-            -- Try to find a StringValue or ObjectValue with pet name
-            if not petModel then
-                for _, child in pairs(obj:GetDescendants()) do
-                    if child:IsA("StringValue") and child.Name:lower():find("pet") then
-                        petName = child.Value
-                        break
-                    end
-                end
-            end
-
-            -- Determine what to show
-            local result = ""
-            if petModel then
-                result = "🥚 " .. obj.Name .. " → " .. petModel.Name
-            elseif petName then
-                result = "🥚 " .. obj.Name .. " → " .. petName
-            else
-                result = "🥚 " .. obj.Name .. " → ??? (Pet hidden)"
-            end
-
-            table.insert(results, result)
-        end
-    end
-
-    return results
-end
-
--- Auto refresh every 2 seconds
-task.spawn(function()
-    while task.wait(2) do
-        local hatchList = getEggInfo()
-        if #hatchList > 0 then
-            box:Set("🔍 Hatch Results:\n" .. table.concat(hatchList, "\n"))
-        else
-            box:Set("🔍 No growing eggs found.")
-        end
-    end
+    -- Add a label to confirm it's visible
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 40)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "✅ UI Visible"
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = frame
 end)
+
+-- Error catcher
+if not success then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Error ❌",
+        Text = tostring(err),
+        Duration = 10
+    })
+end
