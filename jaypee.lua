@@ -1,7 +1,7 @@
 --[[
     @author brivince
     @description Grow a Garden duplicator script (no GUI, compatible with Solara V3)
-    This version auto-duplicates a selected seed or pet every few seconds.
+    Now with auto-renaming of clones and duplication limit.
 ]]
 
 -- Wait for game to fully load
@@ -16,10 +16,16 @@ local Backpack = LocalPlayer:WaitForChild("Backpack")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 --// Configuration
-local ITEM_NAME = "Ostrich" -- Change this to the exact name of the seed or pet you want to duplicate
-local ITEM_TYPE = "Pet"     -- Choose between "Seed" or "Pet"
-local DUPLICATE_INTERVAL = 3 -- Time in seconds between each auto-duplicate
-local DUPLICATE_AMOUNT = 1   -- How many copies per cycle
+local ITEM_NAME = "Ostrich"     -- Exact name of the seed or pet
+local ITEM_TYPE = "Pet"         -- "Seed" or "Pet"
+local DUPLICATE_INTERVAL = 3    -- Time in seconds between each duplication
+local DUPLICATE_AMOUNT = 1      -- Number of clones per cycle
+local DUPLICATION_LIMIT = 10    -- Stop duplicating after this many total clones
+
+--// Counters
+local duplicateCount = 0
+local cloneIndex = 1
+local duplicationActive = true
 
 --// Pet-follow script
 local function petFollowScript(petModel)
@@ -53,11 +59,22 @@ end
 
 --// Duplication loop
 coroutine.wrap(function()
-    while true do
+    while duplicationActive do
+        if duplicateCount >= DUPLICATION_LIMIT then
+            print("[Duplicator] Limit reached. Stopping duplication.")
+            break
+        end
+
         local original = findOriginalItem()
         if original then
             for i = 1, DUPLICATE_AMOUNT do
+                if duplicateCount >= DUPLICATION_LIMIT then break end
+
                 local clone = original:Clone()
+                clone.Name = ITEM_NAME .. "_Clone" .. tostring(cloneIndex)
+                cloneIndex += 1
+                duplicateCount += 1
+
                 if ITEM_TYPE == "Seed" then
                     clone.Parent = Backpack
                 elseif ITEM_TYPE == "Pet" then
@@ -65,11 +82,13 @@ coroutine.wrap(function()
                     clone:MoveTo(Character:GetPivot().Position + Vector3.new(math.random(-5,5), 0, math.random(-5,5)))
                     petFollowScript(clone)
                 end
+
                 wait(0.1)
             end
         else
-            warn("Item not found: " .. ITEM_NAME)
+            warn("[Duplicator] Item not found: " .. ITEM_NAME)
         end
+
         wait(DUPLICATE_INTERVAL)
     end
 end)()
